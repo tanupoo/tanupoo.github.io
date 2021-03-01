@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <link rel="icon" href="data:,"> <!-- NOTE: Remove it for valid icon. -->
+        <title>CSV Reader</title>
+
+        <!--script src="https://cdn.plot.ly/plotly-latest.min.js"></script-->
+        <script src="js/plotly/plotly-1.58.4.min.js"></script>
+
+        <!--script src="https://cdn.rawgit.com/Keyang/node-csvtojson/d41f44aa/browser/csvtojson.min.js"></script-->
+        <script src="js/csv/csvtojson.min.js"></script>
+    </head>
+
+    <body>
+
+        <div>
+            <label for="upload-file">CSVファイル:</label>
+            <input id="upload-file" type="file" multiple>
+        </div>
+        <div>
+            <label for="tag-selector">タグ名</label>
+            <select id="tag-selector"></select>
+            <label for="subtag-selector">サブタグ名</label>
+            <select id="subtag-selector"></select>
+            <label for="interval-configured">設定した通知間隔(秒):</label>
+            <input type="text" id="interval-configured" name="interval">
+        </div>
+        <div id="info"></div>
+        <hr>
+        <div id="canvas1"></div>
+        <hr>
+        <div id="info2"></div>
+
+        <script type="text/javascript">
+
+Date.prototype.toLocalISOString = function() {
+    var tzo = -this.getTimezoneOffset(),
+        dif = tzo >= 0 ? '+' : '-',
+        pad = function(num) {
+            var norm = Math.floor(Math.abs(num));
+            return (norm < 10 ? '0' : '') + norm;
+        };
+    return this.getFullYear() +
+        '-' + pad(this.getMonth() + 1) +
+        '-' + pad(this.getDate()) +
+        'T' + pad(this.getHours()) +
+        ':' + pad(this.getMinutes()) +
+        ':' + pad(this.getSeconds()) +
+        dif + pad(tzo / 60) +
+        ':' + pad(tzo % 60);
+}
+
+var dbx = {};
+var initial_subtag = true;
+
+const dInfo = document.getElementById("info");
+const dInfo2 = document.getElementById("info2");
+
+document.getElementById("upload-file")
+    .addEventListener("change", load_files, false);
+
+const selTag = document.getElementById('tag-selector');
+selTag.onchange = change_tag;
+
+const selSubTag = document.getElementById('subtag-selector');
+selSubTag.onchange = change_subtag;
+
+const dInterval = document.getElementById('interval-configured');
+dInterval.value = 600;
+
+function change_tag()
+{
+    init_subtag();
+    make_subtag();
+    change_subtag();
+    // will call draw_chart() in change_subtag().
+}
+
+function init_subtag()
+{
+    while (selSubTag.options.length > 0) {
+        selSubTag.remove(0);
+    }
+    initial_subtag = true;
+}
+
+function make_subtag()
+{
+    const tag = selTag.selectedOptions[0].value;
+
+    //console.log("subtag:", Object.keys(dbx[tag]));
+    Object.keys(dbx[tag]).sort().forEach(subtag=>{
+        let newOption = document.createElement('option');
+        newOption.appendChild(document.createTextNode(subtag));
+        newOption.setAttribute('value', subtag);
+        if (initial_subtag === true && subtag == 'XYZ_TEMPERATURE') {
+            newOption.setAttribute('selected', true);
+            initial_subtag = false;
+        }
+        selSubTag.appendChild(newOption);
+    });
+}
+
+function get_xtime(ts_list, target_t, do_ceiling)
+{
+    let a = ts_list.filter(x=>{ return x.hd.getTime() == target_t; })[0].v;
+    let b = new Date(a);
+    if (do_ceiling === true) {
+        // ceiling if needed.
+        if (b.getMilliseconds() > 0) {
+            b.setSeconds(1+b.getSeconds());
+            b.setMilliseconds(0);
+        }
+    } else {
+        // otherwise, just flooring.
+        b.setMilliseconds(0);
+    }
+    let c = b.toLocalISOString();
+    return c;
+}
+
+function change_subtag()
+{
+    get_timespan_stat();
+    get_interval_stat();
+    draw_chart();
+}
+
+function get_timespan_stat()
+{
+    const tag = selTag.selectedOptions[0].value;
+    const subtag = selSubTag.selectedOptions[0].value;
+    const base_data = dbx[tag][subtag];
+
+    // 取得したデータの間隔の簡易統計を得る。
+    //console.log("base_data:", base_data);
+
+    // HistoryDateの開始時刻と終了時刻を得る。
+    const min_hd = base_data[0].hd.toLocalISOString();
+    const max_hd = base_data.slice(-1)[0].hd.toLocalISOString();
+
+    // LAST_RECEIPT_TIME(ASでの受信時刻)
+    // LAST_SENT_TIME(NSでの受信時間)
+
+    // LAST_RECEIPT_TIMEとLAST_SENT_TIMEの開始時刻を得る。ミリ秒切り上げ。
+    let target_t;
+    target_t = base_data[0].hd.getTime();
+    const min_lrt = get_xtime(dbx[tag]['LAST_RECEIPT_TIME'], target_t, true);
+    const min_lst = get_xtime(dbx[tag]['LAST_SENT_TIME'], target_t, true);
+
+    // LAST_RECEIPT_TIMEとLAST_SENT_TIMEの終了時刻を得る。ミリ秒切り捨て。
+    target_t = base_data.slice(-1)[0].hd.getTime();
+    const max_lrt = get_xtime(dbx[tag]['LAST_RECEIPT_TIME'], target_t, false);
+    const max_lst = get_xtime(dbx[tag]['LAST_SENT_TIME'], target_t, false);
+
+    dInfo.innerText = `受信期間(SS): ${min_hd} から ${max_hd}\n` +
+        `受信時間(AS): ${min_lrt} から ${max_lrt}\n` +
+        `受信時間(NS): ${min_lst} から ${max_lst}\n`;
+}
+
+function get_interval_stat()
+{
+    const tag = selTag.selectedOptions[0].value;
+    const subtag = selSubTag.selectedOptions[0].value;
+    const base_data = dbx[tag][subtag];
+
+    if (!dInterval.value) {
+        alert("ERROR: interval must be greater than 0.")
+        return;
+    }
+    const ri_value = dInterval.value * 1000;
+
+    // 通知間隔を得る。
+    let ril = [];    // reporting interval list.
+    let not600 = [];
+    for (let i = 0; i < base_data.length - 1; i++) {
+        let interval = base_data[i+1].hd - base_data[i].hd;
+        if (interval != ri_value) {
+            not600.push(base_data[i+1].hd);
+        }
+        ril.push(interval);
+    }
+    let ris = {}; // reporting interval stat.
+    for (let i = 0; i < ril.length; i++) {
+        ril[i] in ris || (ris[ril[i]] = 0); ris[ril[i]]++;
+    }
+    ris = Object.entries(ris).sort((k,j)=>{return j[1]-k[1]});
+    const ri_mode = ris[0];
+
+    dInfo2.innerText = `通知間隔分布:\n`;
+    for (let i = 0; i < ris.length; i++) {
+        dInfo2.innerText += `　　: ${ris[i][0]/1000}秒 ${ris[i][1]}回\n`;
+    }
+    dInfo2.innerText += `間隔が600秒ではない時刻: ${not600.length}回\n`;
+    for (let i = 0; i < not600.length; i++) {
+        dInfo2.innerText += `　　${not600[i].toLocalISOString()}\n`;
+    }
+}
+
+/*
+## CSV file:
+
+- ASの出力
+
+```
+    Lcode,Value,Quality,HistoryDate
+    C01_S002.LAST_RECEIPT_TIME,2020-12-31T23:59:23.042+09:00,192,2021/01/01 0:00
+        :
+```
+
+## input_data
+
+- csvtojson()の出力
+
+```
+    [
+        { 
+            Lcode: 'C01_S001.LAST_RECEIPT_TIME',
+            Value: '2021-01-01T13:44:21.214+09:00',
+            Quality: '192',
+            HistoryDate: '2021/01/01 13:45:00'
+        },
+        ...
+    ]
+```
+
+## dbx
+
+- unravel the input_data into a set of data_id per tag.
+- タグ毎項目毎に HistoryDate, value に分解する。
+- 本当は tag, HistoryDate, sugtab1_value, subtab2_value, ... にしたい。
+
+```
+    {
+        'C01_S001': {
+            'LAST_RECEIPT_TIME': [
+                {
+                    'ts'': '2021/01/01 13:45:00',
+                    'v': '2021-01-01T13:44:21.214+09:00',
+                },
+                '...'
+            ],
+            'LAST_SENT_TIME': [ { ... }, ... ],
+            'XYZ_TEMPERATURE': [ { ... }, ... ],
+            ...
+        }
+    }
+```
+*/
+
+function load_files()
+{
+    // dbx must be initialized here only once.
+    dbx = {};
+
+    // set nb_files.
+    let nb_files = this.files.length;
+    dInfo.innerText = `読込中 ${nb_files}`;
+
+    // dealing with all files.
+    for (let i = 0; i < this.files.length; i++) {
+        this.files[i].text().then(csv_file=>{
+            //console.log("csv_file:", csv_file);
+            const plot_data = csv()
+            .fromString(csv_file)
+            .then(input_data=>{
+                //console.log("input_data:", input_data);
+                // for sure, acsending sorting input_data with HistoryDate.
+                // 念の為、input_dataを HistoryDateでソートする。
+                return Object.entries(input_data)
+                    .sort(function(a,b){
+                        return Date.parse(a[1].HistoryDate) - Date.parse(b[1].HistoryDate)
+                    });
+            })
+            .then(input_data=>{
+                //console.log("input_data:", input_data);
+                // reproducing dbx.
+                input_data.forEach(x=>{
+                    let tag = x[1].Lcode.split('.')[0]
+                    let subtag = x[1].Lcode.split('.')[1]
+                    tag in dbx || (dbx[tag] = {});
+                    subtag in dbx[tag] || (dbx[tag][subtag] = []);
+                    dbx[tag][subtag].push({
+                        'ts': x[1].HistoryDate,
+                        'v': x[1].Value,
+                        'hd': new Date(x[1].HistoryDate)
+                    });
+                });
+                nb_files -= 1;
+                dInfo.innerText = `読込中 ${nb_files}`;
+                if (nb_files == 0) {
+                    dInfo.innerText = '完了';
+                }
+            })
+        });
+    }
+
+    // check if all files are loaded.
+    window.setTimeout(check_promise, 1000);
+    function check_promise() {
+        if (nb_files > 0) {
+            // if not, set timeout again.
+            window.setTimeout(check_promise, 1000);
+        } else {
+            // if all promises are done, finish it.
+            post_load_files();
+            return;
+        }
+    }
+
+    function post_load_files() {
+        // creating the tag selector.
+        //console.log("tag:", Object.keys(dbx));
+        while (selTag.options.length > 0) {
+            // initialize the selector everytime.
+            selTag.remove(0);
+        }
+        //init_subtag();
+        Object.keys(dbx).sort().forEach(tag_name=>{
+            let newOption = document.createElement('option');
+            newOption.appendChild(document.createTextNode(tag_name));
+            newOption.setAttribute('value', tag_name);
+            selTag.appendChild(newOption);
+        });
+        change_tag();
+    }
+}
+
+function draw_chart()
+{
+    const tag = selTag.selectedOptions[0].value;
+    const subtag = selSubTag.selectedOptions[0].value;
+
+    /*
+    2021/01/01 03:34:00 2021/01/01 03:34:00 sushi_reader.html:130:29
+    2021/01/01 03:44:00 2021/01/01 03:35:00 sushi_reader.html:130:29
+    2021/01/01 03:54:00 2021/01/01 03:35:00 sushi_reader.html:130:29
+    */
+    /*
+    varr = dbx[tag]['XYZ_TEMPERATURE'];
+    vlist = [];
+    for (let i = 0, j = 0; i < dbx[tag][subtag].length; i++) {
+        while (true) {
+            //console.log(varr[j].ts, dbx[tag][subtag][i].ts);
+            if (varr[j].ts == dbx[tag][subtag][i].ts) {
+                vlist.push(varr[j].v);
+                j++;
+                break;
+            } else if (varr[j].ts > dbx[tag][subtag][i].ts) {
+                vlist.push(-99);
+                break;
+            } else if (varr[j].ts < dbx[tag][subtag][i].ts) {
+                throw "ERROR: varr[j].ts < base[i].ts should happen.";
+            }
+            j++;
+        }
+    }
+    //console.log(vlist);
+    */
+
+    data_list = [
+        {
+            x: dbx[tag][subtag].map(a=>a.ts),
+            y: dbx[tag][subtag].map(x=>x.v)
+        },
+        /*
+        {
+            x: dbx[tag]['LAST_SENT_TIME'].map(x=>x.ts),
+            y: dbx[tag]['LAST_SENT_TIME'].map(x=>{
+                return (x.hd - Date.parse(x.v))/1000; // in sec
+            })
+        },
+        */
+    ];
+
+    //console.log("data_list:", data_list);
+    canvas1 = document.getElementById('canvas1');
+    Plotly.react(canvas1, data_list)
+        .catch(function(e){console.log("err2:", e)});
+}
+
+        </script>
+    </body>
+</html>
