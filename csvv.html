@@ -27,8 +27,12 @@
         <hr>
         <div id="info2"></div>
 
+        <!--
         <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
         <script src="https://cdn.rawgit.com/Keyang/node-csvtojson/d41f44aa/browser/csvtojson.min.js"></script>
+        -->
+        <script src="js/plotly/plotly-1.58.4.min.js"></script>
+        <script src="js/csv/csvtojson.min.js"></script>
 
         <script type="text/javascript">
 
@@ -344,13 +348,21 @@ function draw_chart()
         data_list.push({
             name: subtag,
             x: dbx[tag][subtag].map(a=>a.ts),
-            y: dbx[tag][subtag].map(x=>x.v)
+            y: dbx[tag][subtag].map(x=>x.v),
+            yaxis: i % 2 == 0 ? 'y' : 'y2',
         });
     }
 
+    let layout = {
+        yaxis2: {
+            overlaying: 'y',
+            side: 'right'
+        }
+    };
+
     //console.log("data_list:", data_list);
     canvas1 = document.getElementById('canvas1');
-    Plotly.react(canvas1, data_list)
+    Plotly.react(canvas1, data_list, layout)
         .catch(function(e){console.log("err2:", e)});
 }
 
