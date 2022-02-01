@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <link rel="icon" href="data:,"> <!-- NOTE: Remove it for valid icon. -->
+        <title>template</title>
+    </head>
+
+    <body>
+
+    <div id="base" class="box">
+        <div id="input-box" class="box">
+            <div>
+                <label for="input-text">変換前</label>
+            </div>
+            <textarea id="input-text" cols="80" rows="24"></textarea>
+        </div>
+        <div id="outupt-box" class="box">
+            <div>
+                <label for="output-text">変換後</label>
+            </div>
+            <textarea id="output-text" cols="80" rows="24" disabled></textarea>
+        </div>
+        <div id="control-box" class="box">
+            <input id="submit-text" type="submit" value="変換">
+            <input id="clear-text" type="submit" value="クリア">
+        </div>
+    </div>
+
+<style>
+
+.box {
+    border: 1px solid silver;
+    text-align: center;
+}
+
+#base {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 80% 1fr;
+    grid-template-areas:
+        "A B"
+        "C C";
+    border: 1px solid silver;
+}
+
+#input-box { grid-area: A; }
+#outupt-box { grid-area: B; }
+#control-box { grid-area: C; }
+</style>
+
+<script>
+
+// 百、二百、千 → 100、200、1000 はどうしようか…
+
+const elm_output = document.getElementById('output-text')
+const elm_input = document.getElementById('input-text')
+document.getElementById('submit-text').addEventListener('click', ev_translate)
+document.getElementById('clear-text').addEventListener('click', ()=>elm_input.value = '')
+
+var test_input;
+//test_input = document.getElementById('input-text').value
+document.getElementById('input-text').value = `
+十 → 10
+百万 → 1000000
+千十 → 1010
+千百十 → 1110
+十万千 → 101000
+三千二百一 → 3201
+百十億十万千 → 11000101000
+四千九百七十六 → 4976
+二百二十二万三百二 → 2220302
+二百二十二万零三百零二 → 2220302
+一千とんで二十四 → 1000とんで24
+二百二十二万は、二百万と十一万が二つ → 2220000は、2000000と、110000が2つ
+百、二百、千 → 100、200、1000
+二十七分尺之一十七 → 27分尺17
+一〇・〇一 → 10.01
+・〇一 → .01
+二、四二六・二五 → 2426..25
+一、二三二、四二六・二五 → 1232426.25
+〇・〇一ワット → 0.01W
+十・〇一ワット → 10.01W
+一ワット → 1W
+〇ワット → 0W
+
+三　主として火災、盗難その他非常の通報又はこれに付随する制御を行うものであつて、F一D、F二D若しくはG一D電波四二六・二五MHz以上四二六・八三七五MHz以下の周波数のうち、四二六・二五MHz及び四二六・二五MHzに一二・五kHzの整数倍を加えたもの(占有周波数帯幅が八・五kHz以下の場合に限る。)又は四二六・二六二五MHz及び四二六・二六二五MHzに二五kHzの整数倍を加えたもの(占有周波数帯幅が八・五kHzを超え一六kHz以下の場合に限る。)を使用し、かつ、空中線電力が一ワット以下であるもの(以下「小電力セキュリティシステムの無線局」という。)
+四　主としてデータ伝送のために無線通信を行うもの(電気通信回線設備に接続するものを含む。)であつて、次に掲げる周波数の電波を使用し、かつ、空中線電力が〇・五八ワット以下であるもの(第十一号に規定する五・二GHz帯高出力データ通信システムの無線局を除く。)(以下「小電力データ通信システムの無線局」という。)
+(１)　二、四〇〇MHz以上二、四八三・五MHz以下の周波数
+(２)　二、四七一MHz以上二、四九七MHz以下の周波数
+(３)　五、一五〇MHzを超え五、三五〇MHz以下又は五、四七〇MHzを超え五、七三〇MHz以下の周波数(複数の電波を同時に使用する場合は、総務大臣が別に告示する周波数に限る。)(総務大臣が別に告示する場所において使用するものを除く。)
+(４)　二四・七七GHz以上二五・二三GHz以下の周波数であつて二四・七七GHz又は二四・七七GHzに一〇MHzの整数倍を加えたもの
+(５)　五七GHzを超え六六GHz以下の周波数
+五　一、八九三・六五MHz以上一、九〇五・九五MHz以下の周波数の電波であつて、一、八九三・六五MHz及び一、八九三・六五MHzに三〇〇kHzの整数倍を加えたもの、一、八九五・六一六MHz以上一、九〇四・二五六MHz以下の周波数の電波であつて、一、八九五・六一六MHz及び一、八九五・六一六MHzに一、七二八kHzの整数倍を加えたもの又は一、八九七・四MHz、一、八九九・一MHz、一、八九九・二MHz若しくは一、九〇一MHzの周波数の電波を使用し、空中線電力が二四〇ミリワット以下であつて、総務大臣が別に告示する電波の型式及び用途に適合するもの(以下「デジタルコードレス電話の無線局」という。)
+六　一、八八四・六五MHz以上一、九一五・五五MHz以下の周波数であつて一、八八四・六五MHz及び一、八八四・六五MHzに三〇〇kHzの整数倍を加えたもの(総務大臣が別に告示する周波数を除く。)を使用し、空中線電力が〇・〇一ワット以下であつて総務大臣が別に告示する電波の型式及び用途に適合するもの(無線通信を中継する機能を備えるものを除く。以下「PHSの陸上移動局」という。)
+七　狭域通信システムの陸上移動局(A一D又はG一D電波による五・八一五GHz、五・八二〇GHz、五・八二五GHz、五・八三〇GHz、五・八三五GHz、五・八四〇GHz又は五・八四五GHzの周波数を使用し、かつ、空中線電力が〇・〇一ワット以下である陸上移動局をいう。以下同じ。)及び狭域通信システムの陸上移動局の無線設備の試験のための通信を行う無線局(狭域通信システムの陸上移動局の無線設備の試験若しくは調整を行うための無線通信を行う無線局であつて、A一D又はG一D電波による五・七七五GHz、五・七八〇GHz、五・七八五GHz、五・七九〇GHz、五・七九五GHz、五・八〇〇GHz又は五・八〇五GHzの周波数を使用し、かつ、空中線電力が〇・〇〇一ワット以下であるものをいう。)
+八　五GHz帯無線アクセスシステム(四、九〇〇MHzを超え五、〇〇〇MHz以下のうち総務大臣が別に告示する周波数の電波を使用し、主としてデータ伝送のために基地局と陸上移動局との間若しくは陸上移動局相互間で行う無線通信(陸上移動中継局の中継によるものを含む。)又は携帯基地局と携帯局(上空での運用を除く。)との間若しくは携帯局(上空での運用を除く。)相互間で行う無線通信をいう。)の陸上移動局又は携帯局であつて、かつ、空中線電力が〇・〇一ワット以下であるもの
+九　超広帯域無線システムの無線局
+`
+
+function full2half(str)
+{
+    return str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, s => {
+        return String.fromCharCode(s.charCodeAt(0) - 0xfee0)
+    })
+}
+
+//
+// kanji number to arabic number
+//
+function kn2an(str)
+{
+    const numTab = {
+        '〇': 0,
+        '零': 0,
+        '一': 1,
+        '二': 2,
+        '三': 3,
+        '四': 4,
+        '五': 5,
+        '六': 6,
+        '七': 7,
+        '八': 8,
+        '九': 9,
+    }
+    const reNum = new RegExp(`[${Object.keys(numTab).join('')}]`)
+
+    //    2                   1                     
+    //  1 0 9 8 7 6 5 4 3 2 1 0 9 8 7 6 5 4 3 2 1
+    // 垓０００京０００兆０００億０００万００００
+    const mainDigitTab = {
+        '万': 5,
+        '億': 9,
+        '兆':13,
+        '京':17,
+        '垓':21,
+    }
+    const reDigit = new RegExp(`[${Object.keys(mainDigitTab).join('')}]`)
+
+    //  4 3 2 1
+    // 千百十一
+    const subDigitTab = {
+        '十': 2,
+        '百': 3,
+        '千': 4,
+    }
+    const reSubDigit = new RegExp(`[${Object.keys(subDigitTab).join('')}]`)
+
+    const miscTab = {
+        '、': 0,
+        '・': 0,
+    }
+    const rePunc = new RegExp(`[${Object.keys(miscTab).join('')}]`)
+
+    // 旧: /[〇零一二三四五六七八九十百千万億兆京垓、・]+/g
+    // 新: /[〇零一二三四五六七八九十百千][〇零一二三四五六七八九十百千万億兆京垓、・]*/g
+    const reKnum = new RegExp(`[${Object.keys(Object.assign({}, numTab, subDigitTab)).join('')}][${Object.keys(Object.assign({}, numTab, mainDigitTab, subDigitTab, miscTab)).join('')}]*`, 'g')
+
+    return str.replace(reKnum, s => {
+        let res = []
+        let mp = 1  // main position
+        let sp = 1  // sub position
+        let subdigit = 0;   // >1 なら直前がsubDigit
+        let i = s.length - 1
+        const preset = (d) => {
+            res.push(d);
+            mp = 1;
+            sp = 1;
+            subdigit = 0;
+        }
+        const ppush = (d) => {
+            res.push(d);
+            mp++;
+            sp++;
+        }
+        while (i >= 0) {
+            if (s[i].match(reNum)) {
+                // Num: push(数字)して、mp, spを進める。
+                subdigit = 0
+                ppush(numTab[s[i]])
+            } else if (s[i].match(reDigit)) {
+                // Digit: mpを進めて、spをリセットする。
+                if (subdigit > 1) {
+                    // 直前がsubDigitなら push(1)する。
+                    res.push(1)
+                    mp++
+                }
+                subdigit = 0
+                while (mp < mainDigitTab[s[i]]) {
+                    res.push(0)
+                    mp++
+                }
+                sp = 1
+            } else if (s[i].match(reSubDigit)) {
+                // subDigit: spを進める。
+                if (subdigit > 1) {
+                    // 直前がsubDigitなら push(1)する。
+                    ppush(1);
+                }
+                subdigit = subDigitTab[s[i]];
+                while (sp < subDigitTab[s[i]]) {
+                    ppush(0);
+                }
+            } else if (s[i] == '、') {
+                subdigit = 0;
+                if (sp == 4 &&
+                    res.slice(-3).filter(n=>Number.isInteger(n)).length == 3) {
+                    // 位取りと判断して push(,) する。
+                    res.push(',');
+                    sp = 1;
+                } else {
+                    // 句読点と判断してリセットする。
+                    preset(s[i]);
+                }
+            } else if (s[i] == '・') {
+                if (subdigit > 0) {
+                    // 列挙と判断してリセットする。
+                    // TBD: いまいち
+                    preset(s[i]);
+                } else {
+                    // 小数点と判断する。
+                    preset('.');
+                }
+            } else {
+                console.log("???", mp, sp, res)
+            }
+            i--;
+        }
+        if (subdigit > 1) {
+            // subDigitで終わっていたらpush(1)する。
+            res.push(1);
+        }
+        return `${res.slice().reverse().join('')}`;
+    })
+}
+
+function kana2kana(str)
+{
+    const kanaTab = {
+        'チヤネル' : 'チャネル',
+        'テレビジヨン' : 'テレビジョン',
+        'ワツト' : 'ワット',
+        'ステレオホニツク' : 'ステレオフォニック',
+        'モノホニツク' : 'モノフォニック',
+        'ロボツト' : 'ロボット',
+        'フアクシミリ' : 'ファクシミリ',
+    }
+    const reKana = new RegExp(`(${Object.keys(kanaTab).join('|')})`, 'g')
+    return str.replace(reKana, s => kanaTab[s])
+}
+
+function kana2unit(str)
+{
+    // https://ja.wikipedia.org/wiki/CJK互換用文字
+    // https://0g0.org/topic/unit/
+    const unitTab = {
+        'ミリワット' : 'mW',
+        'マイクロワット' : 'μW',
+        'ミリ秒' : 'ms',
+        'マイクロ秒' : 'µs',
+        'ミリボルト' : 'mV',
+        'マイクロボルト' : 'µV',
+        'ミリアメートル' : 'x10⁴m',
+        'キロメートル' : 'km',
+        'ヘクトメートル' : 'x10²m',
+        'デカメートル' : 'x10m',
+        'デジメートル' : 'x10⁻¹m',
+    }
+    const unit0Tab = {
+        'ワット' : 'W',
+        'ワツト' : 'W',
+        'ボルト' : 'V',
+        'ヘルツ' : 'Hz',
+    }
+    const reKana = new RegExp(`(${Object.keys(unitTab).join('|')})`, 'g')
+    str = str.replace(reKana, s => unitTab[s])
+    //
+    const reUnit = new RegExp(`([\\d\\w])(${Object.keys(unit0Tab).join('|')})`, 'g')
+
+    str = str.replace(reUnit, (s,g1,g2) => {
+        return `${g1}${unit0Tab[g2]}`
+    })
+    return str
+}
+
+function translate_horei(str)
+{
+    str = kn2an(str)
+    str = full2half(str)
+    str = kana2kana(str)
+    str = kana2unit(str)
+    return str
+}
+
+function ev_translate(ev)
+{
+    if (ev.target.id == 'submit-text') {
+        let data = document.getElementById('input-text').value
+        elm_output.value = translate_horei(data)
+    }
+}
+
+</script>
+
+    </body>
+
+</html>
+
