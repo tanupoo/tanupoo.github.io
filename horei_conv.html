@@ -15,13 +15,13 @@
             <div>
                 <label for="input-text">変換前</label>
             </div>
-            <textarea id="input-text" cols="80" rows="24"></textarea>
+            <textarea id="input-text"></textarea>
         </div>
         <div id="outupt-box" class="box">
             <div>
                 <label for="output-text">変換後</label>
             </div>
-            <textarea id="output-text" cols="80" rows="24" disabled></textarea>
+            <textarea id="output-text" disabled></textarea>
         </div>
         <div id="control-box" class="box">
             <input id="submit-text" type="submit" value="変換">
@@ -46,6 +46,11 @@
     border: 1px solid silver;
 }
 
+textarea {
+    width: 95%;
+    height: 92%;
+}
+
 #input-box { grid-area: A; }
 #outupt-box { grid-area: B; }
 #control-box { grid-area: C; }
@@ -55,10 +60,23 @@
 
 // 百、二百、千 → 100、200、1000 はどうしようか…
 
-const elm_output = document.getElementById('output-text')
-const elm_input = document.getElementById('input-text')
-document.getElementById('submit-text').addEventListener('click', ev_translate)
-document.getElementById('clear-text').addEventListener('click', ()=>elm_input.value = '')
+function resize()
+{
+    let e = document.getElementById('base');
+    e.style.setProperty('height', `${window.innerHeight*.98}px`);
+    e.style.setProperty('width', `${window.innerWidth*.98}px`);
+}
+
+window.addEventListener('resize', resize);
+resize();
+
+const elm_input = document.getElementById('input-text');
+const elm_output = document.getElementById('output-text');
+document.getElementById('submit-text').addEventListener('click', ev_translate);
+document.getElementById('clear-text').addEventListener('click', () => {
+    elm_input.value = '';
+    elm_output.value = '';
+})
 
 var test_input;
 //test_input = document.getElementById('input-text').value
