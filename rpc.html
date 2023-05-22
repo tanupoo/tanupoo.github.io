@@ -92,6 +92,11 @@ input[type=text] {
     font-size: large;
     font-weight: bold;
 }
+#credit {
+    text-align: right;
+    font-size: small;
+    font-weight: normal;
+}
 #table_path_loss_model {
     padding: 4px;
 }
@@ -328,9 +333,14 @@ input[type=text] {
         <hr>
         <div class="canvas" id="canvas-path-loss"></div>
 
+        <!--
         <hr>
         <div id="info1"></div>
         <div id="info2"></div>
+        -->
+
+        <hr>
+        <div id="credit"><a href="https://github.com/tanupoo/radioprop-tools">https://github.com/tanupoo/radioprop-tools</a></div>
 
         <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.23.0/plotly.min.js" charset="utf-8"></script>
         <script src="https://cdn.rawgit.com/Keyang/node-csvtojson/d41f44aa/browser/csvtojson.min.js"></script>
@@ -1111,10 +1121,10 @@ function ev_load_product_list_files(ev)
                 input_data.forEach(x => {
                     let v = {
                         'prod': x.ProdName,
-                        'value': parseFloat(x.V),
+                        'value': parseFloat(x.Value),
                         'freq_low': parseFloat(x.FreqL),
                         'freq_high': parseFloat(x.FreqH),
-                        'region': x.R,
+                        'region': x.Region,
                         'id': seq++,
                     };
                     switch (x.ProdType) {
