@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+</head>
+<body>
+    <div id="wrapper">
+        <video hidden id="qrc-video" autoplay playsinline muted></video>
+        <canvas id="qrc-canvas"></canvas>
+        <button id="qrc-start" disabled>読み込み開始</button>
+        <div id="qrc-data"></div>
+    </div>
+
+<script>
+
+const video = document.getElementById('qrc-video');
+const canvas = document.getElementById('qrc-canvas');
+const image = canvas.getContext('2d');
+const video_width = 320;
+const video_height = 240;
+
+const start_button = document.getElementById('qrc-start');
+start_button.addEventListener("click",
+    (ev) => {
+        start_check_qrcode();
+    }, false);
+
+const qrc_data = document.getElementById('qrc-data');
+
+// facingModeはユーザに決めさせるため指定しないのがよい。
+// audio: falseだけでは video.muted=trueにならない。また、getUserMedia()が呼ばれるまでvideoは設定されないのでHTMLでmutedを指定するのがよい。
+const userMedia = { audio: false, video: { width: video_width, height: video_height }};
+canvas.width = video_width;
+canvas.height = video_height;
+
+navigator.mediaDevices.getUserMedia(userMedia)
+    .then((stream) => {
+        video.srcObject = stream;
+        video.play();
+        start_check_qrcode();
+    })
+    .catch((err) => {
+        console.log(`ERROR: ${err}`);
+    });
+
+function start_check_qrcode()
+{
+    start_button.disabled = true;
+    check_qrcode();
+}
+
+function check_qrcode()
+{
+    // ビデオ開始直後に(video.clientWidth, video.clientHeight)が(320, 150)などと期待している値よりも小さい場合がある。
+    // console.log("video size:", video.clientWidth, video.clientHeight);
+    // 十分な画像が取得できないとjsQRでQRコードと判定しないので支障はない。
+    image.drawImage(video, 0, 0, video_width, video_height);
+    let g = image.getImageData(0, 0, video_width, video_height);
+    let ret = jsQR(g.data, g.width, g.height);
+    if (ret) {
+        if (/https?:\/\//.test(ret.data)) {
+            qrc_data.innerHTML = `<a href="${ret.data}">${ret.data}</a>`;
+        } else {
+            qrc_data.textContent = ret.data;
+        }
+        // httpsでアクセスしないとクリップボードは使えない。
+        navigator.clipboard.writeText(ret.data).then((ret) => {}).catch((err) => { console.log(`ERROR: ${err}`)});
+        start_button.disabled = false;
+        return;
+    }
+    setTimeout(check_qrcode, 125);
+}
+
+</script>
+</body>
+</html>
