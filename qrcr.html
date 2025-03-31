@@ -130,7 +130,7 @@ function check_qrcode()
     // 通常は白地に黒だが、黒字に白のQRコードの場合は反転処理が必要になる。
     // jsQRのデフォルトの挙動はどちらも試す"attemptBoth"だけど性能が50％程度劣化するらしい。
     // よって、反転しないをデフォルトにする。
-    // "onlyInvert"を指定するハングアップする。(Firefox 136.0.4 (64-bit))
+    // "onlyInvert"を指定するとハングアップする。(Firefox 136.0.4 (64-bit))
     let ret = jsQR(g.data, g.width, g.height,
         enable_invert.checked ? { inversionAttempts: "attemptBoth" } : {inversionAttempts: "dontInvert"});
     if (ret) {
