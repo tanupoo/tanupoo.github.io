@@ -8,11 +8,6 @@
 
 <body>
     <div>
-        <div id="a3">
-            <div id="qrc-data-label">QRコードの内容</div>
-            <div id="qrc-data"></div>
-        </div>
-        <hr>
         <div id="a1">
             <canvas id="qrc-canvas"></canvas>
         </div>
@@ -33,6 +28,11 @@
                 <input id="enable-clear" type="checkbox" name="enable_clear"></input>
                 <label for="enable-invert">内容をクリアする</label>
         </div>
+        <hr>
+        <div id="a3">
+            <div id="qrc-data-label">QRコードの内容</div>
+            <div id="qrc-data"></div>
+        </div>
     </div>
     <video hidden id="qrc-video" autoplay playsinline muted></video>
 
@@ -40,7 +40,8 @@
 /*#a1, #a2, #a3 { border-style: solid; }*/
 
 hr {
-    margin: 5px;
+    margin-top: 20px;
+    margin-bottom: 20px;
 }
 
 #a1, #a2, #a3 {
@@ -66,6 +67,10 @@ hr {
 
 #qrc-data-label {
     margin-left: 20px;
+}
+
+#qrc-data {
+    margin: 20px 40px 20px;
 }
 </style>
 
@@ -98,6 +103,7 @@ function start()
         (ev) => {
             canvas.width = video_width;
             canvas.height = video_height;
+            video.autofocus = true;
             start_check_qrcode();
         }
     );
@@ -145,7 +151,7 @@ function check_qrcode()
         start_button.disabled = false;
         return;
     }
-    setTimeout(check_qrcode, 125);
+    setTimeout(check_qrcode, 250);
 }
 
 </script>
