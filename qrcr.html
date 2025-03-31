@@ -1,46 +1,121 @@
 <!DOCTYPE html>
+<html lang="en">
 <head>
+    <meta charset="utf-8">
+
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 </head>
+
 <body>
-    <div id="wrapper">
-        <video hidden id="qrc-video" autoplay playsinline muted></video>
-        <canvas id="qrc-canvas"></canvas>
-        <button id="qrc-start" disabled>読み込み開始</button>
-        <div id="qrc-data"></div>
+    <div>
+        <div id="a3">
+            <div id="qrc-data-label">QRコードの内容</div>
+            <div id="qrc-data"></div>
+        </div>
+        <hr>
+        <div id="a1">
+            <canvas id="qrc-canvas"></canvas>
+        </div>
+        <hr>
+        <div id="a2">
+            <span>
+                <button id="qrc-start" disabled>再読込</button>
+            </span>
+            <span>
+                <input id="enable-href" type="checkbox" name="enable_href" checked></input>
+                <label for="enable-href">URL加工する</label>
+            </span>
+            <span>
+                <input id="enable-invert" type="checkbox" name="enable_invert"></input>
+                <label for="enable-invert">白黒反転する</label>
+            </span>
+            <span>
+                <input id="enable-clear" type="checkbox" name="enable_clear"></input>
+                <label for="enable-invert">内容をクリアする</label>
+        </div>
     </div>
+    <video hidden id="qrc-video" autoplay playsinline muted></video>
+
+<style>
+/*#a1, #a2, #a3 { border-style: solid; }*/
+
+hr {
+    margin: 5px;
+}
+
+#a1, #a2, #a3 {
+    padding: 3px;
+    margin: 2px;
+    font-size: 24px;
+}
+
+#qrc-canvas {
+    margin-left: 20px;
+    margin-right: 10px;
+}
+
+#qrc-start {
+    padding: 2px;
+    margin-left: 20px;
+    font-size: 28px;
+}
+
+#enable-href, #enable-invert, #enable-clear {
+    margin-left: 20px;
+}
+
+#qrc-data-label {
+    margin-left: 20px;
+}
+</style>
 
 <script>
 
-const video = document.getElementById('qrc-video');
-const canvas = document.getElementById('qrc-canvas');
-const image = canvas.getContext('2d');
 const video_width = 640;
 const video_height = 480;
-
+const video = document.getElementById('qrc-video');
+const canvas = document.getElementById('qrc-canvas');
+const qrc_image = canvas.getContext('2d');
 const start_button = document.getElementById('qrc-start');
-start_button.addEventListener("click",
-    (ev) => {
-        start_check_qrcode();
-    }, false);
-
 const qrc_data = document.getElementById('qrc-data');
+const enable_invert = document.getElementById('enable-invert');
+const enable_href = document.getElementById('enable-href');
 
-// facingModeはユーザに決めさせるため指定しないのがよい。
-// audio: falseだけでは video.muted=trueにならない。また、getUserMedia()が呼ばれるまでvideoは設定されないのでHTMLでmutedを指定するのがよい。
-const userMedia = { audio: false, video: { width: video_width, height: video_height, facingMode: 'environment' }};
-canvas.width = video_width;
-canvas.height = video_height;
+function start()
+{
+    const userMedia = { audio: false, video: { width: video_width, height: video_height, facingMode: "environment" }};
+    navigator.mediaDevices.getUserMedia(userMedia)
+        .then((stream) => {
+            video.srcObject = stream;
+            video.play();
+        })
+        .catch((err) => {
+            console.log(`ERROR: ${err}`);
+        });
 
-navigator.mediaDevices.getUserMedia(userMedia)
-    .then((stream) => {
-        video.srcObject = stream;
-        video.play();
-        start_check_qrcode();
-    })
-    .catch((err) => {
-        console.log(`ERROR: ${err}`);
-    });
+    video.addEventListener(
+        "canplay",
+        (ev) => {
+            canvas.width = video_width;
+            canvas.height = video_height;
+            start_check_qrcode();
+        }
+    );
+
+    start_button.addEventListener(
+        "click",
+        (ev) => {
+            if (enable_clear.checked) {
+                qrc_data.textContent = '';
+                qrc_data.innterHTML = '';
+            }
+            start_check_qrcode();
+        },
+        false
+    );
+}
+
+start();
 
 function start_check_qrcode()
 {
@@ -50,14 +125,17 @@ function start_check_qrcode()
 
 function check_qrcode()
 {
-    // ビデオ開始直後に(video.clientWidth, video.clientHeight)が(320, 150)などと期待している値よりも小さい場合がある。
-    // console.log("video size:", video.clientWidth, video.clientHeight);
-    // 十分な画像が取得できないとjsQRでQRコードと判定しないので支障はない。
-    image.drawImage(video, 0, 0, video_width, video_height);
-    let g = image.getImageData(0, 0, video_width, video_height);
-    let ret = jsQR(g.data, g.width, g.height);
+    qrc_image.drawImage(video, 0, 0, video_width, video_height);
+    let g = qrc_image.getImageData(0, 0, video_width, video_height);
+    // 通常は白地に黒だが、黒字に白のQRコードの場合は反転処理が必要になる。
+    // jsQRのデフォルトの挙動はどちらも試す"attemptBoth"だけど性能が50％程度劣化するらしい。
+    // よって、反転しないをデフォルトにする。
+    // "onlyInvert"を指定するハングアップする。(Firefox 136.0.4 (64-bit))
+    let ret = jsQR(g.data, g.width, g.height,
+        enable_invert.checked ? { inversionAttempts: "attemptBoth" } : {inversionAttempts: "dontInvert"});
     if (ret) {
-        if (/https?:\/\//.test(ret.data)) {
+        // URLだったらリンクを作る。
+        if (enable_href.checked && /https?:\/\//.test(ret.data)) {
             qrc_data.innerHTML = `<a href="${ret.data}">${ret.data}</a>`;
         } else {
             qrc_data.textContent = ret.data;
